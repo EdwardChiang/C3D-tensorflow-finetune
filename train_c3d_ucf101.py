@@ -32,10 +32,10 @@ gpu_num = 1
 #flags.DEFINE_float('learning_rate', 0.0, 'Initial learning rate.')
 flags.DEFINE_integer('max_steps', 5000, 'Number of steps to run trainer.')
 # flags.DEFINE_integer('max_steps', 10, 'Number of steps to run trainer.')
-flags.DEFINE_integer('batch_size', 10, 'Batch size.')
+flags.DEFINE_integer('batch_size', 16, 'Batch size.')
 FLAGS = flags.FLAGS
 MOVING_AVERAGE_DECAY = 0.9999
-model_save_dir = './finetune-models'
+model_save_dir = './models/finetune-models/'
 
 def placeholder_inputs(batch_size):
   """Generate placeholder variables to represent the input tensors.
@@ -198,13 +198,14 @@ def run_training():
 
     # Create a saver for writing training checkpoints.
     # saver = tf.train.Saver(weights.values() + biases.values())
-    saver = tf.train.Saver(varlist1)
+    saver = tf.train.Saver(varlist1, max_to_keep=0)
     # saver = tf.train.Saver(set(weights.values()) | set(biases.values()))
     init = tf.global_variables_initializer()
 
     # Create a session for running Ops on the Graph.
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.6)
     sess = tf.Session(
-                    config=tf.ConfigProto(allow_soft_placement=True)
+                    config=tf.ConfigProto(allow_soft_placement=True, gpu_options=gpu_options)
                     )
     sess.run(init)
     if os.path.isfile(model_filename) and use_pretrained_model:
@@ -236,7 +237,13 @@ def run_training():
 
       # Save a checkpoint and evaluate the model periodically.
       if (step) % 10 == 0 or (step + 1) == FLAGS.max_steps:
-        saver.save(sess, os.path.join(model_save_dir, 'c3d_bridgestone'), global_step=step)
+        m_dir = model_save_dir + "step_" + str(step)
+        try:
+          os.makedirs(m_dir)
+        except:
+          print(m_dir, " exists")
+
+        saver.save(sess, os.path.join(m_dir, 'c3d_bridgestone'), global_step=step)
         print('Training Data Eval:')
         summary, acc = sess.run(
                         [merged, accuracy],

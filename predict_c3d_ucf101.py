@@ -26,6 +26,8 @@ import tensorflow as tf
 import input_data
 import c3d_model
 import numpy as np
+import csv
+import argparse
 
 # Basic model parameters as external flags.
 flags = tf.app.flags
@@ -67,10 +69,11 @@ def _variable_with_weight_decay(name, shape, stddev, wd):
     tf.add_to_collection('losses', weight_decay)
   return var
 
-def run_test():
-  model_name = "./sports1m_finetuning_ucf101.model"
+def run_test(model_step):
+  # model_name = "./sports1m_finetuning_ucf101.model"
   # model_name = "./c3d_ucf101_finetune_whole_iter_20000_TF.model"
-  test_list_file = 'list/test.list'
+  # test_list_file = 'list/test.list'
+  test_list_file = 'list/all_data.list'
   num_test_videos = len(list(open(test_list_file,'r')))
   print("Number of test videos={}".format(num_test_videos))
 
@@ -105,23 +108,28 @@ def run_test():
             }
   logits = []
   for gpu_index in range(0, gpu_num):
-    with tf.device('/gpu:%d' % gpu_index):
+    with tf.device('/cpu:%d' % gpu_index):
       logit = c3d_model.inference_c3d(images_placeholder[gpu_index * FLAGS.batch_size:(gpu_index + 1) * FLAGS.batch_size,:,:,:,:], 0.6, FLAGS.batch_size, weights, biases)
       logits.append(logit)
   logits = tf.concat(logits,0)
   norm_score = tf.nn.softmax(logits)
-  saver = tf.train.Saver()
+  # saver = tf.train.Saver()
+  # 600 the best
+  model_dir = 'finetune-models_' + str(model_step) + '/'
+  saver = tf.train.import_meta_graph(model_dir + 'c3d_bridgestone-' + str(model_step) + '.meta')
   sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+  saver.restore(sess, tf.train.latest_checkpoint(model_dir))
   init = tf.global_variables_initializer()
   sess.run(init)
   # Create a saver for writing training checkpoints.
-  saver.restore(sess, model_name)
+  # saver.restore(sess, model_name)
+
   # And then after everything is built, start the training loop.
   bufsize = 0
-  # write_file = open("predict_ret.txt", "w+", bufsize)
-  write_file = open("predict_ret.txt", "w+")
+  write_file = open('predict_ret.txt', 'w+')
   next_start_pos = 0
   all_steps = int((num_test_videos - 1) / (FLAGS.batch_size * gpu_num) + 1)
+  tp, fp, tn, fn = 0, 0, 0, 0
   for step in xrange(all_steps):
     # Fill a feed dictionary with the actual set of images and labels
     # for this particular training step.
@@ -136,6 +144,7 @@ def run_test():
             session=sess,
             feed_dict={images_placeholder: test_images}
             )
+    print(predict_score)
     for i in range(0, valid_len):
       true_label = test_labels[i],
       top1_predicted_label = np.argmax(predict_score[i])
@@ -145,11 +154,39 @@ def run_test():
               predict_score[i][true_label],
               top1_predicted_label,
               predict_score[i][top1_predicted_label]))
+      
+      true_label, top1_predicted_label = int(true_label[0]), int(top1_predicted_label)
+      if true_label == 0:
+          if top1_predicted_label == true_label:
+              tp += 1
+          else:
+              fn += 1
+      else:
+          if top1_predicted_label == true_label:
+              tn += 1
+          else:
+              fp += 1
   write_file.close()
-  print("done")
+
+  print(tp, fp, tn, fn)
+  precision = tp / (tp + fp)
+  recall = tp / (tp + fn)
+  f1_score = 2 / ( 1 / precision + 1 / recall )
+  with open('result.csv', 'a', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow([str(model_step), str(f1_score), str(precision), str(recall), str(tp), str(fp), str(tn), str(fn)])
+      
+
+    print("done")
 
 def main(_):
-  run_test()
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--model-step", help="the step of the pretrained model")
+  args = parser.parse_args()
+  model_step = int(args.model_step)
+
+  print("Current model_step: ", model_step)
+  run_test(model_step)
 
 if __name__ == '__main__':
   tf.app.run()
