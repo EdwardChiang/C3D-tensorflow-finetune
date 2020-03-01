@@ -23,8 +23,7 @@ forward to make predictions.
 import tensorflow as tf
 
 # The UCF-101 dataset has 101 classes
-NUM_CLASSES = 101
-# NUM_CLASSES = 2
+NUM_CLASSES = 2
 
 # Images are cropped to (CROP_SIZE, CROP_SIZE)
 CROP_SIZE = 112
@@ -52,6 +51,7 @@ def inference_c3d(_X, _dropout, batch_size, _weights, _biases):
   conv1.trainable = False
 
   pool1 = max_pool('pool1', conv1, k=1)
+  pool1.trainable = False
 
   # Convolution Layer
   conv2 = conv3d('conv2', pool1, _weights['wc2'], _biases['bc2'])
@@ -60,6 +60,7 @@ def inference_c3d(_X, _dropout, batch_size, _weights, _biases):
   conv2.trainable = False
 
   pool2 = max_pool('pool2', conv2, k=2)
+  pool2.trainable = False
 
   # Convolution Layer
   conv3 = conv3d('conv3a', pool2, _weights['wc3a'], _biases['bc3a'])
@@ -68,7 +69,9 @@ def inference_c3d(_X, _dropout, batch_size, _weights, _biases):
   conv3 = tf.nn.relu(conv3, 'relu3b')
   # Freeze the pretrained weight
   conv3.trainable = False
+  
   pool3 = max_pool('pool3', conv3, k=2)
+  pool3.trainable = False
 
   # Convolution Layer
   conv4 = conv3d('conv4a', pool3, _weights['wc4a'], _biases['bc4a'])
@@ -77,7 +80,9 @@ def inference_c3d(_X, _dropout, batch_size, _weights, _biases):
   conv4 = tf.nn.relu(conv4, 'relu4b')
   # Freeze the pretrained weight
   conv4.trainable = False
+  
   pool4 = max_pool('pool4', conv4, k=2)
+  pool4.trainable = False
 
   # Convolution Layer
   conv5 = conv3d('conv5a', pool4, _weights['wc5a'], _biases['bc5a'])
@@ -87,6 +92,7 @@ def inference_c3d(_X, _dropout, batch_size, _weights, _biases):
   # Freeze the pretrained weight
   conv5.trainable = False
   pool5 = max_pool('pool5', conv5, k=2)
+  pool5.trainable = False
 
   # Fully connected layer
   pool5 = tf.transpose(pool5, perm=[0,1,4,2,3])
@@ -104,9 +110,8 @@ def inference_c3d(_X, _dropout, batch_size, _weights, _biases):
   dense2.trainable = False
 
   # Output: class prediction
-  out = tf.matmul(dense2, _weights['out']) + _biases['out']
-  return out
-  out1 = tf.nn.relu(tf.matmul(dense2, _weights['out1']) + _biases['out1']) # Relu activation
-  out2 = tf.matmul(out1, _weights['out2']) + _biases['out2']
+  # out1 = tf.nn.relu(tf.matmul(dense2, _weights['out1']) + _biases['out1']) # Relu activation
+  # out2 = tf.nn.softmax(tf.matmul(out1, _weights['out2']) + _biases['out2'])
+  out1 = tf.nn.softmax(tf.matmul(dense2, _weights['out']) + _biases['out']) # Softmax activation
 
-  return out2
+  return out1

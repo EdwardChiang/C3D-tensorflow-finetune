@@ -23,8 +23,8 @@ import os.path
 import time
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
-import input_data
-import c3d_model
+import input_data_single as input_data
+import onlyfc as c3d_model
 import numpy as np
 import csv
 import argparse
@@ -70,10 +70,11 @@ def _variable_with_weight_decay(name, shape, stddev, wd):
   return var
 
 def run_test(model_step):
-  model_name = "./sports1m_finetuning_ucf101.model"
+  # model_name = "./sports1m_finetuning_ucf101.model"
   # model_name = "./c3d_ucf101_finetune_whole_iter_20000_TF.model"
-  test_list_file = 'list/old_test.list'
-  # test_list_file = 'list/bg-flow-all.list'
+  # test_list_file = 'list/test.list'
+  # test_list_file = 'list/all_data.list'
+  test_list_file = 'list/bg-flow-all.list'
   num_test_videos = len(list(open(test_list_file,'r')))
   print("Number of test videos={}".format(num_test_videos))
 
@@ -81,34 +82,12 @@ def run_test(model_step):
   images_placeholder, labels_placeholder = placeholder_inputs(FLAGS.batch_size * gpu_num)
   with tf.variable_scope('var_name') as var_scope:
     weights = {
-            'wc1': _variable_with_weight_decay('wc1', [3, 3, 3, 3, 64], 0.04, 0.00),
-            'wc2': _variable_with_weight_decay('wc2', [3, 3, 3, 64, 128], 0.04, 0.00),
-            'wc3a': _variable_with_weight_decay('wc3a', [3, 3, 3, 128, 256], 0.04, 0.00),
-            'wc3b': _variable_with_weight_decay('wc3b', [3, 3, 3, 256, 256], 0.04, 0.00),
-            'wc4a': _variable_with_weight_decay('wc4a', [3, 3, 3, 256, 512], 0.04, 0.00),
-            'wc4b': _variable_with_weight_decay('wc4b', [3, 3, 3, 512, 512], 0.04, 0.00),
-            'wc5a': _variable_with_weight_decay('wc5a', [3, 3, 3, 512, 512], 0.04, 0.00),
-            'wc5b': _variable_with_weight_decay('wc5b', [3, 3, 3, 512, 512], 0.04, 0.00),
-            'wd1': _variable_with_weight_decay('wd1', [8192, 4096], 0.04, 0.001),
-            'wd2': _variable_with_weight_decay('wd2', [4096, 4096], 0.04, 0.002),
-            'out': _variable_with_weight_decay('wout', [4096, c3d_model.NUM_CLASSES], 0.04, 0.005)
-            # 'out1': _variable_with_weight_decay('wout1', [4096, 2048], 0.04, 0.0005),
-            # 'out2': _variable_with_weight_decay('wout2', [2048, c3d_model.NUM_CLASSES], 0.04, 0.0005)
+            'out1': _variable_with_weight_decay('wout1', [12544, 4096], 0.04, 0.0005),
+            'out2': _variable_with_weight_decay('wout2', [4096, c3d_model.NUM_CLASSES], 0.04, 0.0005)
             }
     biases = {
-            'bc1': _variable_with_weight_decay('bc1', [64], 0.04, 0.0),
-            'bc2': _variable_with_weight_decay('bc2', [128], 0.04, 0.0),
-            'bc3a': _variable_with_weight_decay('bc3a', [256], 0.04, 0.0),
-            'bc3b': _variable_with_weight_decay('bc3b', [256], 0.04, 0.0),
-            'bc4a': _variable_with_weight_decay('bc4a', [512], 0.04, 0.0),
-            'bc4b': _variable_with_weight_decay('bc4b', [512], 0.04, 0.0),
-            'bc5a': _variable_with_weight_decay('bc5a', [512], 0.04, 0.0),
-            'bc5b': _variable_with_weight_decay('bc5b', [512], 0.04, 0.0),
-            'bd1': _variable_with_weight_decay('bd1', [4096], 0.04, 0.0),
-            'bd2': _variable_with_weight_decay('bd2', [4096], 0.04, 0.0),
-            'out': _variable_with_weight_decay('bout', [c3d_model.NUM_CLASSES], 0.04, 0.0)
-            # 'out1': _variable_with_weight_decay('bout1', [2048], 0.04, 0.0),
-            # 'out2': _variable_with_weight_decay('bout2', [c3d_model.NUM_CLASSES], 0.04, 0.0)
+            'out1': _variable_with_weight_decay('bout1', [4096], 0.04, 0.0),
+            'out2': _variable_with_weight_decay('bout2', [c3d_model.NUM_CLASSES], 0.04, 0.0)
             }
   logits = []
   for gpu_index in range(0, gpu_num):
@@ -117,16 +96,16 @@ def run_test(model_step):
       logits.append(logit)
   logits = tf.concat(logits,0)
   norm_score = tf.nn.softmax(logits)
-  saver = tf.train.Saver()
+  # saver = tf.train.Saver()
   # 600 the best
-  model_dir = 'models/finetune-models/2fc_flow/step_' + str(model_step) + '/'
-  # saver = tf.train.import_meta_graph(model_dir + 'c3d_bridgestone-' + str(model_step) + '.meta')
+  model_dir = 'models/finetune-models/step_' + str(model_step) + '/'
+  saver = tf.train.import_meta_graph(model_dir + 'c3d_bridgestone-' + str(model_step) + '.meta')
   sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
-  # saver.restore(sess, tf.train.latest_checkpoint(model_dir))
+  saver.restore(sess, tf.train.latest_checkpoint(model_dir))
   init = tf.global_variables_initializer()
   sess.run(init)
   # Create a saver for writing training checkpoints.
-  saver.restore(sess, model_name)
+  # saver.restore(sess, model_name)
 
   # And then after everything is built, start the training loop.
   bufsize = 0
@@ -142,6 +121,7 @@ def run_test(model_step):
             input_data.read_clip_and_label(
                     test_list_file,
                     FLAGS.batch_size * gpu_num,
+                    num_frames_per_clip=c3d_model.NUM_FRAMES_PER_CLIP,
                     start_pos=next_start_pos
                     )
     predict_score = norm_score.eval(

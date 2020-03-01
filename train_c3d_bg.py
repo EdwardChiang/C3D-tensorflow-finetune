@@ -21,8 +21,8 @@ import time
 import numpy
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
-import input_data
-import c3d_model
+import input_data_bg as input_data
+import bg_c3d_model as c3d_model
 import math
 import numpy as np
 
@@ -30,12 +30,12 @@ import numpy as np
 flags = tf.app.flags
 gpu_num = 1
 #flags.DEFINE_float('learning_rate', 0.0, 'Initial learning rate.')
-flags.DEFINE_integer('max_steps', 5000, 'Number of steps to run trainer.')
+flags.DEFINE_integer('max_steps', 5001, 'Number of steps to run trainer.')
 # flags.DEFINE_integer('max_steps', 10, 'Number of steps to run trainer.')
-flags.DEFINE_integer('batch_size', 16, 'Batch size.')
+flags.DEFINE_integer('batch_size', 8, 'Batch size.')
 FLAGS = flags.FLAGS
 MOVING_AVERAGE_DECAY = 0.9999
-model_save_dir = './models/finetune-models/'
+model_save_dir = './models/finetune-models/rgb-2fc/'
 
 def placeholder_inputs(batch_size):
   """Generate placeholder variables to represent the input tensors.
@@ -145,9 +145,9 @@ def run_training():
               'wc5b': _variable_with_weight_decay('wc5b', [3, 3, 3, 512, 512], 0.0005),
               'wd1': _variable_with_weight_decay('wd1', [8192, 4096], 0.0005),
               'wd2': _variable_with_weight_decay('wd2', [4096, 4096], 0.0005),
-              # 'out': _variable_with_weight_decay('wout', [4096, c3d_model.NUM_CLASSES], 0.0005)
-              'out1': _variable_with_weight_decay('wout1', [4096, 2048], 0.0005),
-              'out2': _variable_with_weight_decay('wout2', [2048, c3d_model.NUM_CLASSES], 0.0005)
+              'out': _variable_with_weight_decay('wout', [4096, c3d_model.NUM_CLASSES], 0.0005)
+            #   'out1': _variable_with_weight_decay('wout1', [4096, 2048], 0.0005),
+            #   'out2': _variable_with_weight_decay('wout2', [2048, c3d_model.NUM_CLASSES], 0.0005)
               }
       biases = {
               'bc1': _variable_with_weight_decay('bc1', [64], 0.000),
@@ -160,16 +160,17 @@ def run_training():
               'bc5b': _variable_with_weight_decay('bc5b', [512], 0.000),
               'bd1': _variable_with_weight_decay('bd1', [4096], 0.000),
               'bd2': _variable_with_weight_decay('bd2', [4096], 0.000),
-              # 'out': _variable_with_weight_decay('bout', [c3d_model.NUM_CLASSES], 0.000),
-              'out1': _variable_with_weight_decay('bout1', [2048], 0.0),
-              'out2': _variable_with_weight_decay('bout2', [c3d_model.NUM_CLASSES], 0.0)
+              'out': _variable_with_weight_decay('bout', [c3d_model.NUM_CLASSES], 0.000),
+            #   'out1': _variable_with_weight_decay('bout1', [2048], 0.0),
+            #   'out2': _variable_with_weight_decay('bout2', [c3d_model.NUM_CLASSES], 0.0)
               }
     for gpu_index in range(0, gpu_num):
       with tf.device('/gpu:%d' % gpu_index):
         
         # varlist2 = [ weights['out'],biases['out'] ]
         # varlist1 = list( set(weights.values() + biases.values()) - set(varlist2) )
-        varlist2 = [ weights['out1'], weights['out2'], biases['out1'], biases['out2'] ]
+        # varlist2 = [ weights['out1'], weights['out2'], biases['out1'], biases['out2'] ]
+        varlist2 = [ weights['out'], biases['out'] ]
         varlist1 = list( (set(weights.values()) | set(biases.values())) - set(varlist2) )
         logit = c3d_model.inference_c3d(
                         images_placeholder[gpu_index * FLAGS.batch_size:(gpu_index + 1) * FLAGS.batch_size,:,:,:,:],
@@ -184,27 +185,29 @@ def run_training():
                         logit,
                         labels_placeholder[gpu_index * FLAGS.batch_size:(gpu_index + 1) * FLAGS.batch_size]
                         )
-        grads1 = opt_stable.compute_gradients(loss, varlist1)
+        # grads1 = opt_stable.compute_gradients(loss, varlist1)
         grads2 = opt_finetuning.compute_gradients(loss, varlist2)
-        tower_grads1.append(grads1)
+        # tower_grads1.append(grads1)
         tower_grads2.append(grads2)
         logits.append(logit)
     logits = tf.concat(logits,0)
     accuracy = tower_acc(logits, labels_placeholder)
     tf.summary.scalar('accuracy', accuracy)
-    grads1 = average_gradients(tower_grads1)
+    # grads1 = average_gradients(tower_grads1)
     grads2 = average_gradients(tower_grads2)
-    apply_gradient_op1 = opt_stable.apply_gradients(grads1)
+    # apply_gradient_op1 = opt_stable.apply_gradients(grads1)
     apply_gradient_op2 = opt_finetuning.apply_gradients(grads2, global_step=global_step)
     variable_averages = tf.train.ExponentialMovingAverage(MOVING_AVERAGE_DECAY)
     variables_averages_op = variable_averages.apply(tf.trainable_variables())
-    train_op = tf.group(apply_gradient_op1, apply_gradient_op2, variables_averages_op)
+    # train_op = tf.group(apply_gradient_op1, apply_gradient_op2, variables_averages_op)
+    train_op = tf.group(apply_gradient_op2, variables_averages_op)
     null_op = tf.no_op()
 
     # Create a saver for writing training checkpoints.
     # saver = tf.train.Saver(weights.values() + biases.values())
     # saver = tf.train.Saver(set(weights.values()) | set(biases.values()))
-    saver = tf.train.Saver(varlist1, max_to_keep=0)
+    saver = tf.train.Saver(varlist1)
+    new_saver = tf.train.Saver(set(weights.values()) | set(biases.values()), max_to_keep=0)
     init = tf.global_variables_initializer()
 
     # Create a session for running Ops on the Graph.
@@ -222,12 +225,13 @@ def run_training():
     test_writer = tf.summary.FileWriter('./visual_logs/test', sess.graph)
     for step in xrange(FLAGS.max_steps):
       print('Start training')
+    #   print("weights['wc1']: ", sess.run(weights['wc1'][0][0][0][0]))
+      print("weights['out']: ", sess.run(weights['out']))
       sys.stdout.flush()
 
       start_time = time.time()
       train_images, train_labels, _, _, _ = input_data.read_clip_and_label(
-                      # filename='list/train.list',
-                      filename='list/bg-flow-train.list',
+                      filename='list/train.list',
                       batch_size=FLAGS.batch_size * gpu_num,
                       num_frames_per_clip=c3d_model.NUM_FRAMES_PER_CLIP,
                       crop_size=c3d_model.CROP_SIZE,
@@ -242,14 +246,15 @@ def run_training():
       sys.stdout.flush()
 
       # Save a checkpoint and evaluate the model periodically.
-      if (step) % 10 == 0 or (step + 1) == FLAGS.max_steps:
+      if (step) % 100 == 0 or (step + 1) == FLAGS.max_steps:
         m_dir = model_save_dir + "step_" + str(step)
         try:
           os.makedirs(m_dir)
         except:
           print(m_dir, " exists")
 
-        saver.save(sess, os.path.join(m_dir, 'c3d_bridgestone'), global_step=step)
+        # saver.save(sess, os.path.join(m_dir, 'c3d_bridgestone'), global_step=step)
+        new_saver.save(sess, os.path.join(m_dir, 'c3d_bridgestone'), global_step=step)
         print('Training Data Eval:')
         summary, acc = sess.run(
                         [merged, accuracy],
@@ -262,8 +267,8 @@ def run_training():
         print('Validation Data Eval:')
         sys.stdout.flush()
         val_images, val_labels, _, _, _ = input_data.read_clip_and_label(
-                        # filename='list/test.list',
-                        filename='list/bg-flow-test.list',
+                        filename='list/test.list',
+                        # filename='list/bg-flow-test.list',
                         batch_size=FLAGS.batch_size * gpu_num,
                         num_frames_per_clip=c3d_model.NUM_FRAMES_PER_CLIP,
                         crop_size=c3d_model.CROP_SIZE,

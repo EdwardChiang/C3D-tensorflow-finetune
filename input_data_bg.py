@@ -52,7 +52,6 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
   batch_index = 0
   next_batch_start = -1
   lines = list(lines)
-  # np_mean = np.load('crop_mean.npy').reshape([num_frames_per_clip, crop_size, crop_size, 3])
   np_mean = np.load('crop_mean.npy').reshape([num_frames_per_clip, crop_size, crop_size, 3])
   # Forcing shuffle, if start_pos is not specified
   if start_pos < 0:
@@ -65,6 +64,8 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
   else:
     # Process videos sequentially
     video_indices = range(start_pos, len(lines))
+
+  _num = 0
   for index in video_indices:
     if(batch_index>=batch_size):
       next_batch_start = index
@@ -81,15 +82,18 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
         img = Image.fromarray(tmp_data[j].astype(np.uint8))
         if(img.width>img.height):
           scale = float(crop_size)/float(img.height)
-          img = np.array(cv2.resize(np.array(img),(int(img.width * scale + 1), crop_size))).astype(np.float32)
+        #   img = np.array(cv2.resize(np.array(img),(int(img.width * scale + 1), crop_size))).astype(np.float32)
+          img = np.array(cv2.resize(np.array(img), (crop_size * 2, crop_size * 2))).astype(np.float32)
         else:
           scale = float(crop_size)/float(img.width)
-          img = np.array(cv2.resize(np.array(img),(crop_size, int(img.height * scale + 1)))).astype(np.float32)
+        #   img = np.array(cv2.resize(np.array(img),(crop_size, int(img.height * scale + 1)))).astype(np.float32)
+          img = np.array(cv2.resize(np.array(img), (crop_size * 2, crop_size * 2))).astype(np.float32)
         crop_x = int((img.shape[0] - crop_size)/2)
         crop_y = int((img.shape[1] - crop_size)/2)
 
         # For rgb
-        img = img[crop_x:crop_x+crop_size, crop_y:crop_y+crop_size,:] - np_mean[j]
+        # img = img[crop_x:crop_x+crop_size, crop_y:crop_y+crop_size,:] - np_mean[j]
+        img = img[crop_x:crop_x+crop_size, crop_y:crop_y+crop_size,:]
         
         # For gray scale
         # img = img[crop_x:crop_x+crop_size, crop_y:crop_y+crop_size]
@@ -97,6 +101,19 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
         # img = np.array([img, img, img])
         # img = np.transpose(img, (2, 1, 0))
         # img -= np_mean[j]
+
+        # For testing cropping effect
+        # tmp_crop_size = 112
+        # path = "output/" + str(_num) + ".jpg"
+        # save_img = Image.fromarray(tmp_data[j].astype(np.uint8))
+        # scale = float(tmp_crop_size)/float(save_img.height)
+        # # save_img = np.array(cv2.resize(np.array(save_img),(int(save_img.width * scale + 1), tmp_crop_size))).astype(np.float32)
+        # save_img = np.array(cv2.resize(np.array(save_img),(224, 224))).astype(np.float32)
+        # crop_x = int((save_img.shape[0] - tmp_crop_size)/2)
+        # crop_y = int((save_img.shape[1] - tmp_crop_size)/2)
+        # save_img = save_img[crop_x:crop_x+tmp_crop_size, crop_y:crop_y+tmp_crop_size,:]
+        # cv2.imwrite(path, np.array(save_img))
+        # _num += 1
 
         img_datas.append(img)
       data.append(img_datas)

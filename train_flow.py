@@ -21,8 +21,10 @@ import time
 import numpy
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
-import input_data
-import c3d_model
+# import input_data
+import input_data_single as input_data
+# import c3d_model
+import onlyfc as c3d_model
 import math
 import numpy as np
 
@@ -135,33 +137,33 @@ def run_training():
     opt_finetuning = tf.train.AdamOptimizer(1e-3)
     with tf.variable_scope('var_name') as var_scope:
       weights = {
-              'wc1': _variable_with_weight_decay('wc1', [3, 3, 3, 3, 64], 0.0005),
-              'wc2': _variable_with_weight_decay('wc2', [3, 3, 3, 64, 128], 0.0005),
-              'wc3a': _variable_with_weight_decay('wc3a', [3, 3, 3, 128, 256], 0.0005),
-              'wc3b': _variable_with_weight_decay('wc3b', [3, 3, 3, 256, 256], 0.0005),
-              'wc4a': _variable_with_weight_decay('wc4a', [3, 3, 3, 256, 512], 0.0005),
-              'wc4b': _variable_with_weight_decay('wc4b', [3, 3, 3, 512, 512], 0.0005),
-              'wc5a': _variable_with_weight_decay('wc5a', [3, 3, 3, 512, 512], 0.0005),
-              'wc5b': _variable_with_weight_decay('wc5b', [3, 3, 3, 512, 512], 0.0005),
-              'wd1': _variable_with_weight_decay('wd1', [8192, 4096], 0.0005),
-              'wd2': _variable_with_weight_decay('wd2', [4096, 4096], 0.0005),
-              # 'out': _variable_with_weight_decay('wout', [4096, c3d_model.NUM_CLASSES], 0.0005)
-              'out1': _variable_with_weight_decay('wout1', [4096, 2048], 0.0005),
-              'out2': _variable_with_weight_decay('wout2', [2048, c3d_model.NUM_CLASSES], 0.0005)
+            #   'wc1': _variable_with_weight_decay('wc1', [3, 3, 3, 3, 64], 0.0005),
+            #   'wc2': _variable_with_weight_decay('wc2', [3, 3, 3, 64, 128], 0.0005),
+            #   'wc3a': _variable_with_weight_decay('wc3a', [3, 3, 3, 128, 256], 0.0005),
+            #   'wc3b': _variable_with_weight_decay('wc3b', [3, 3, 3, 256, 256], 0.0005),
+            #   'wc4a': _variable_with_weight_decay('wc4a', [3, 3, 3, 256, 512], 0.0005),
+            #   'wc4b': _variable_with_weight_decay('wc4b', [3, 3, 3, 512, 512], 0.0005),
+            #   'wc5a': _variable_with_weight_decay('wc5a', [3, 3, 3, 512, 512], 0.0005),
+            #   'wc5b': _variable_with_weight_decay('wc5b', [3, 3, 3, 512, 512], 0.0005),
+            #   'wd1': _variable_with_weight_decay('wd1', [8192, 4096], 0.0005),
+            #   'wd2': _variable_with_weight_decay('wd2', [4096, 4096], 0.0005),
+            #   'out': _variable_with_weight_decay('wout', [4096, c3d_model.NUM_CLASSES], 0.0005)
+              'out1': _variable_with_weight_decay('wout1', [12544, 4096], 0.0005),
+              'out2': _variable_with_weight_decay('wout2', [4096, c3d_model.NUM_CLASSES], 0.0005)
               }
       biases = {
-              'bc1': _variable_with_weight_decay('bc1', [64], 0.000),
-              'bc2': _variable_with_weight_decay('bc2', [128], 0.000),
-              'bc3a': _variable_with_weight_decay('bc3a', [256], 0.000),
-              'bc3b': _variable_with_weight_decay('bc3b', [256], 0.000),
-              'bc4a': _variable_with_weight_decay('bc4a', [512], 0.000),
-              'bc4b': _variable_with_weight_decay('bc4b', [512], 0.000),
-              'bc5a': _variable_with_weight_decay('bc5a', [512], 0.000),
-              'bc5b': _variable_with_weight_decay('bc5b', [512], 0.000),
-              'bd1': _variable_with_weight_decay('bd1', [4096], 0.000),
-              'bd2': _variable_with_weight_decay('bd2', [4096], 0.000),
-              # 'out': _variable_with_weight_decay('bout', [c3d_model.NUM_CLASSES], 0.000),
-              'out1': _variable_with_weight_decay('bout1', [2048], 0.0),
+            #   'bc1': _variable_with_weight_decay('bc1', [64], 0.000),
+            #   'bc2': _variable_with_weight_decay('bc2', [128], 0.000),
+            #   'bc3a': _variable_with_weight_decay('bc3a', [256], 0.000),
+            #   'bc3b': _variable_with_weight_decay('bc3b', [256], 0.000),
+            #   'bc4a': _variable_with_weight_decay('bc4a', [512], 0.000),
+            #   'bc4b': _variable_with_weight_decay('bc4b', [512], 0.000),
+            #   'bc5a': _variable_with_weight_decay('bc5a', [512], 0.000),
+            #   'bc5b': _variable_with_weight_decay('bc5b', [512], 0.000),
+            #   'bd1': _variable_with_weight_decay('bd1', [4096], 0.000),
+            #   'bd2': _variable_with_weight_decay('bd2', [4096], 0.000),
+            #   'out': _variable_with_weight_decay('bout', [c3d_model.NUM_CLASSES], 0.000),
+              'out1': _variable_with_weight_decay('bout1', [4096], 0.0),
               'out2': _variable_with_weight_decay('bout2', [c3d_model.NUM_CLASSES], 0.0)
               }
     for gpu_index in range(0, gpu_num):
@@ -184,27 +186,28 @@ def run_training():
                         logit,
                         labels_placeholder[gpu_index * FLAGS.batch_size:(gpu_index + 1) * FLAGS.batch_size]
                         )
-        grads1 = opt_stable.compute_gradients(loss, varlist1)
+        # grads1 = opt_stable.compute_gradients(loss, varlist1)
         grads2 = opt_finetuning.compute_gradients(loss, varlist2)
-        tower_grads1.append(grads1)
+        # tower_grads1.append(grads1)
         tower_grads2.append(grads2)
         logits.append(logit)
     logits = tf.concat(logits,0)
     accuracy = tower_acc(logits, labels_placeholder)
     tf.summary.scalar('accuracy', accuracy)
-    grads1 = average_gradients(tower_grads1)
+    # grads1 = average_gradients(tower_grads1)
     grads2 = average_gradients(tower_grads2)
-    apply_gradient_op1 = opt_stable.apply_gradients(grads1)
+    # apply_gradient_op1 = opt_stable.apply_gradients(grads1)
     apply_gradient_op2 = opt_finetuning.apply_gradients(grads2, global_step=global_step)
     variable_averages = tf.train.ExponentialMovingAverage(MOVING_AVERAGE_DECAY)
     variables_averages_op = variable_averages.apply(tf.trainable_variables())
-    train_op = tf.group(apply_gradient_op1, apply_gradient_op2, variables_averages_op)
+    # train_op = tf.group(apply_gradient_op1, apply_gradient_op2, variables_averages_op)
+    train_op = tf.group(apply_gradient_op2, variables_averages_op)
     null_op = tf.no_op()
 
     # Create a saver for writing training checkpoints.
     # saver = tf.train.Saver(weights.values() + biases.values())
+    saver = tf.train.Saver(varlist2, max_to_keep=0)
     # saver = tf.train.Saver(set(weights.values()) | set(biases.values()))
-    saver = tf.train.Saver(varlist1, max_to_keep=0)
     init = tf.global_variables_initializer()
 
     # Create a session for running Ops on the Graph.
@@ -213,8 +216,8 @@ def run_training():
                     config=tf.ConfigProto(allow_soft_placement=True, gpu_options=gpu_options)
                     )
     sess.run(init)
-    if os.path.isfile(model_filename) and use_pretrained_model:
-      saver.restore(sess, model_filename)
+    # if os.path.isfile(model_filename) and use_pretrained_model:
+    #   saver.restore(sess, model_filename)
 
     # Create summary writter
     merged = tf.summary.merge_all()
@@ -272,9 +275,9 @@ def run_training():
         summary, acc = sess.run(
                         [merged, accuracy],
                         feed_dict={
-                                        images_placeholder: val_images,
-                                        labels_placeholder: val_labels
-                                        })
+                          images_placeholder: val_images,
+                          labels_placeholder: val_labels
+                          })
         print ("accuracy: " + "{:.5f}".format(acc))
         sys.stdout.flush()
         test_writer.add_summary(summary, step)

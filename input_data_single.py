@@ -53,7 +53,6 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
   next_batch_start = -1
   lines = list(lines)
   # np_mean = np.load('crop_mean.npy').reshape([num_frames_per_clip, crop_size, crop_size, 3])
-  np_mean = np.load('crop_mean.npy').reshape([num_frames_per_clip, crop_size, crop_size, 3])
   # Forcing shuffle, if start_pos is not specified
   if start_pos < 0:
     shuffle = True
@@ -64,7 +63,8 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
     random.shuffle(video_indices)
   else:
     # Process videos sequentially
-    video_indices = range(start_pos, len(lines))
+    video_indices = list(range(start_pos, len(lines)))
+  
   for index in video_indices:
     if(batch_index>=batch_size):
       next_batch_start = index
@@ -76,33 +76,34 @@ def read_clip_and_label(filename, batch_size, start_pos=-1, num_frames_per_clip=
       print("Loading a video clip from {}...".format(dirname))
     tmp_data, _ = get_frames_data(dirname, num_frames_per_clip)
     img_datas = []
-    if(len(tmp_data)!=0):
-      for j in xrange(len(tmp_data)):
-        img = Image.fromarray(tmp_data[j].astype(np.uint8))
-        if(img.width>img.height):
-          scale = float(crop_size)/float(img.height)
-          img = np.array(cv2.resize(np.array(img),(int(img.width * scale + 1), crop_size))).astype(np.float32)
-        else:
-          scale = float(crop_size)/float(img.width)
-          img = np.array(cv2.resize(np.array(img),(crop_size, int(img.height * scale + 1)))).astype(np.float32)
-        crop_x = int((img.shape[0] - crop_size)/2)
-        crop_y = int((img.shape[1] - crop_size)/2)
+    # if(len(tmp_data)!=0):
+    for j in xrange(len(tmp_data)):
+      img = Image.fromarray(tmp_data[j].astype(np.uint8))
+      if(img.width>img.height):
+        scale = float(crop_size)/float(img.height)
+        img = np.array(cv2.resize(np.array(img),(int(img.width * scale + 1), crop_size))).astype(np.float32)
+      else:
+        scale = float(crop_size)/float(img.width)
+        img = np.array(cv2.resize(np.array(img),(crop_size, int(img.height * scale + 1)))).astype(np.float32)
+      crop_x = int((img.shape[0] - crop_size)/2)
+      crop_y = int((img.shape[1] - crop_size)/2)
 
-        # For rgb
-        img = img[crop_x:crop_x+crop_size, crop_y:crop_y+crop_size,:] - np_mean[j]
-        
-        # For gray scale
-        # img = img[crop_x:crop_x+crop_size, crop_y:crop_y+crop_size]
-        # x_size, y_size = img.shape[0], img.shape[1]
-        # img = np.array([img, img, img])
-        # img = np.transpose(img, (2, 1, 0))
-        # img -= np_mean[j]
-
-        img_datas.append(img)
-      data.append(img_datas)
-      label.append(int(tmp_label))
-      batch_index = batch_index + 1
-      read_dirnames.append(dirname)
+      # For rgb
+      # img = img[crop_x:crop_x+crop_size, crop_y:crop_y+crop_size,:] - np_mean[j]
+      
+      # For gray scale
+      # img = img[crop_x:crop_x+crop_size, crop_y:crop_y+crop_size]
+      # x_size, y_size = img.shape[0], img.shape[1]
+      # img = np.array([img, img, img])
+      # img = np.transpose(img, (2, 1, 0))
+      # img -= np_mean[j]
+      img = np.array([img[crop_x:crop_x+crop_size, crop_y:crop_y+crop_size]])
+      img = np.transpose(img, (2, 1, 0))
+      img_datas.append(img)
+    data.append(img_datas)
+    label.append(int(tmp_label))
+    batch_index = batch_index + 1
+    read_dirnames.append(dirname)
 
   # pad (duplicate) data/label if less than batch_size
   valid_len = len(data)
